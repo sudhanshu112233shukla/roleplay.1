@@ -1,0 +1,9 @@
+# Optional edge/runtime dependencies.
+# Install only what your target device supports.
+
+# llama.cpp python bindings (GGUF inference)
+llama-cpp-python
+
+# ONNX Runtime GenAI (LLM generation runtime)
+onnxruntime-genai
+

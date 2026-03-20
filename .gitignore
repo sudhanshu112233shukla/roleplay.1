@@ -1,0 +1,41 @@
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Training outputs
+tinyllama-roleplay-lora/
+tinyllama-roleplay-multistage/
+outputs/
+logs/
+
+# Local datasets
+datasets/local/*.cache
+
+# Large artifacts / checkpoints
+artifacts/
+training_data/
+datasets/local/
+**/checkpoints/
+**/final_merged/
+**/final_adapter/
+**/*.gguf
+**/*.safetensors
+**/*.bin
+**/*.pt
+**/*.pth
+**/*.zip
+
+# llama.cpp builds and prebuilt binaries
+deployment/llama.cpp/
+deployment/llama.cpp-build/
+deployment/llama.cpp-prebuilt/
+
+# OS/editor noise
+Thumbs.db
+Desktop.ini
+roleplay_(2) (2).py
