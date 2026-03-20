@@ -1,63 +1,132 @@
-# Roleplay AI System (Edge-Ready Architecture)
+# Roleplay AI System (TinyLlama + LoRA, Edge‑Ready)
 
-This repo currently contains two Colab notebooks for training a TinyLlama roleplay model.
+A modular roleplay/chat AI stack built around TinyLlama with LoRA fine‑tuning, dynamic personas, memory, and deployment paths for GGUF/llama.cpp and ONNX. This repo is designed to support fast iteration: train in Colab or locally, test with multi‑turn scripts, then export for lightweight inference.
 
-This refactor adds a modular, production-oriented architecture while preserving all core
-functionality already present in the notebooks:
+## What This Gives You
 
-- Single-stage QLoRA + LoRA SFT training on roleplay-ish conversation datasets.
-- Multi-stage pipeline: Stage 1 SFT (instruction), Stage 2 SFT (roleplay), Stage 3 DPO (preference).
-- Retrieval memory system (FAISS + SentenceTransformers).
-- Character profile system (YAML profiles).
-- Dynamic dataset expansion (log + curate).
-- Prompt builder that injects: character, world state, memory, chat history, user input.
-- World state and emotion tracking engines.
+- **Dynamic persona control** (runtime “be X” instructions, no static files required)
+- **YAML character profiles** (optional static personas)
+- **Prompt system** with memory, world state, and emotion engines
+- **Training pipelines**: single‑stage, chunked SFT (local + HF), multi‑stage
+- **Deployment pipeline**: merge LoRA → export → GGUF / ONNX
+- **Multi‑turn test scripts** for persona switching validation
 
-## Structure
+## Repository Layout
 
-- `models/`: model loading, LoRA, export (adapter + merged), edge-export notes
-- `characters/`: YAML profiles + loader/repository
-- `prompt_builder/`: robust prompt construction + truncation
-- `memory/`: FAISS-backed long-term memory store + importance heuristics
-- `world_state/`: world-state schema + update engine
-- `emotion_engine/`: emotion-state schema + update engine
-- `datasets/`: roleplay JSONL datasets (data only)
-- `training_data/`: canonical dataset schema, HF adapters, local JSONL helpers, expansion utilities
-- `training/`: single-stage + multi-stage training pipelines (SFT + DPO)
-- `inference/`: chat session orchestration + backends (Transformers; stubs for edge backends)
-- `notebooks/`: refactored notebooks that call the modules (original notebooks remain at repo root)
-
-## Quick Start (Colab)
-
-1. Clone the repo in Colab.
-2. Open `notebooks/roleplay_training_refactored.ipynb` or `notebooks/roleplay_multistage_refactored.ipynb`.
-3. If you keep getting disconnected / lose GPU, use chunked training notebooks:
-   - `notebooks/roleplay_training_chunked_hf.ipynb` (HF datasets, streaming)
-   - `notebooks/roleplay_training_chunked_local.ipynb` (local JSONL/CSV, streaming)
+- `characters/` – character profiles, loaders, dynamic persona support
+- `datasets/` – dataset loaders + local dataset cache
+- `deployment/` – GGUF/llama.cpp + ONNX tooling
+- `emotion_engine/` – emotion state + update logic
+- `inference/` – chat session orchestration + backends
+- `memory/` – FAISS memory + importance heuristics
+- `models/` – loaders, LoRA helpers, export notes
+- `notebooks/` – Colab training notebooks
+- `prompt_builder/` – prompt assembly + truncation logic
+- `training/` – training entrypoints (single, chunked, multi‑stage)
+- `training_data/` – dataset schema + helpers
+- `world_state/` – world state schema + update logic
 
 ## Quick Start (Local)
 
-This repo does not pin dependencies by default. Start with:
-
 ```powershell
 pip install -r requirements.txt
+
+# Single‑stage SFT
 python -m training.train_single_stage --help
-python -m training.train_multistage --help
+
+# Chunked SFT (local JSONL)
 python -m training.train_chunked_sft --help
+
+# Chunked SFT (Hugging Face streaming)
 python -m training.train_chunked_sft_hf --help
+
+# Multi‑stage pipeline
+python -m training.train_multistage --help
 ```
 
-## Notes
+## Quick Start (Colab)
 
-- Model weights are not stored in this repo.
-- For edge deployment (GGUF / llama.cpp / ONNX), see `models/EDGE_EXPORT.md`.
+Open one of these notebooks:
 
-## Characters (Static + Dynamic)
+- `notebooks/roleplay_training_chunked_hf.ipynb` (HF datasets, streaming)
+- `notebooks/roleplay_training_chunked_local.ipynb` (local JSONL/CSV)
+- `notebooks/roleplay_training_refactored.ipynb`
+- `notebooks/roleplay_multistage_refactored.ipynb`
 
-- Static characters: YAML files under `characters/profiles/` (e.g. `wizard.yaml`). Run with `--character wizard`.
-- Dynamic personas: if enabled (default), users can type messages like **"Be Iron Man today and talk to me"** and the session will switch persona even if no YAML exists.
-  - Optional auto-save: pass `--auto-save-dynamic-profiles-dir <dir>` to save frequently used dynamic personas under `<dir>/user/<id>.yaml` (load later via `--character user/<id>`).
+If you get disconnected, use **chunked training** + auto‑resume checkpoints.
 
-## On-Device Deployment
+## Training (Typical Flow)
 
-See `deployment/README.md` for the end-to-end flow (GGUF/llama.cpp and ONNX Runtime GenAI).
+1. **Prepare dataset** (e.g., persona‑switch JSONL).
+2. **Run chunked SFT** with checkpointing and optional auto‑resume.
+3. **Merge LoRA** into base model (optional).
+4. **Export to GGUF** and quantize for CPU/edge.
+5. **Run multi‑turn persona test** to validate switching.
+
+Example (local JSONL chunked SFT):
+
+```powershell
+python -m training.train_chunked_sft `
+  --dataset-path .\artifacts\persona_switch.jsonl `
+  --output-root .\artifacts\persona_switch_run `
+  --max-steps 1200 `
+  --save-steps 50 `
+  --merge-at-end
+```
+
+## Inference
+
+### Transformers (local dev)
+```powershell
+python -m inference.dynamic_persona_chat --help
+```
+
+### GGUF + llama.cpp
+```powershell
+python -m inference.gguf_multi_turn `
+  --model .\artifacts\final_merged.q4_k_m.gguf `
+  --turns-file .\artifacts\turns_persona_short.json `
+  --use-remainder
+```
+
+## Dynamic Persona Control
+
+Users can ask for any persona at runtime:
+
+- “Be Iron Man today and talk to me.”
+- “Act like a wise mentor.”
+- “Talk like a funny friend.”
+
+The prompt builder extracts persona instructions and keeps them consistent across turns.
+
+## Deployment
+
+- **GGUF / llama.cpp**: see `deployment/README.md`
+- **ONNX**: see `deployment/onnx/ORT_GENAI.md`
+- **Edge export notes**: `models/EDGE_EXPORT.md`
+
+## Artifacts & Checkpoints (Not in Git)
+
+Large files are excluded by `.gitignore`. Typical outputs:
+
+- `artifacts/` (merged models, GGUF, checkpoints)
+- `training_data/` (generated datasets)
+- `deployment/llama.cpp*` (builds/binaries)
+
+Keep these locally or in Drive; don’t commit them.
+
+## Troubleshooting (Common)
+
+- **Persona switching is weak** → dataset needs stronger persona examples.
+- **Colab resets** → use chunked training + auto‑resume checkpoints.
+- **GGUF conversion fails** → ensure tokenizer files exist in merged model.
+
+## Roadmap Ideas
+
+- Larger persona dataset generation
+- Automated evaluation harness for persona adherence
+- Mobile‑first inference integration (Android/iOS)
+
+---
+
+If you want: I can add a one‑click Colab launcher badge and a minimal “first run” script.
